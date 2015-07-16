@@ -1,6 +1,12 @@
 #include <avr/EEPROM.h>
-#include <phys253.h>          
+#include <phys253.h>    
+#include <avr/interrupt.h>
 #include <LiquidCrystal.h>
+
+volatile unsigned int NUM = 0;
+int SERVO_FRONT = 2; //Servo for front arm
+
+ISR(INT0_vect) {setServo(SERVO_FRONT, 110); NUM++;};
 
 class MenuItem
 {
@@ -32,35 +38,57 @@ MenuItem ThresholdTape    = MenuItem("Threshold Tape");
 MenuItem ProportionalGainIR = MenuItem("P-gain IR");
 MenuItem ThresholdIR      = MenuItem("Threshold IR");
 MenuItem menuItems[]      = {Speed, ProportionalGainTape, DerivativeGain, IntegralGain, ThresholdTape, ProportionalGainIR, ThresholdIR};
+
+void enableExternalInterrupt(unsigned int INTX, unsigned int mode)
+{
+	if (INTX > 3 || mode > 3 || mode == 1) return;
+	cli();
+	/* Allow pin to trigger interrupts        */
+	EIMSK |= (1 << INTX);
+	/* Clear the interrupt configuration bits */
+	EICRA &= ~(1 << (INTX*2+0));
+	EICRA &= ~(1 << (INTX*2+1));
+	/* Set new interrupt configuration bits   */
+	EICRA |= (mode & (1 << 1)) << (INTX*2+0);
+	EICRA |= (mode & (1 << 0)) << (INTX*2+1);
+	sei();
+}
  
+void disableExternalInterrupt(unsigned int INTX)
+{
+	if (INTX > 3) return;
+	EIMSK &= ~(1 << INTX);
+}
+
 void setup()
 {
   #include <phys253setup.txt>
   LCD.clear();
   LCD.home();
-  
-  int MOTOR_LEFT = 2; //PWM output for left motor
-  int MOTOR_RIGHT = 3; //PWM output for right motor
-  int QRD_LEFT = 0; //Left QRD for tape following
-  int QRD_RIGHT = 1; //Right QRD for tape following
-  int QRD_PET = 2; //QRD for locating pets
-  int SWITCH_PLATE = 1; //Switch to see if pet is on plate
-  int SERVO_CRANE = 1; //Servo for rotation of crane arm
-  int SERVO_FRONT = 2; //Servo for front arm
-  int MOTOR_CRANE = 1; //Motor of arm movement
-  int SWITCH_CRANE_1 = 2; //Switch for the crane arm in the down position
-  int SWITCH_CRANE_2 = 3; //Switch for the crane arm in the up position
-  
-  int NUM = 0;
-  int MAX_ANALOG = 1023;
+  enableExternalInterrupt(INT0, RISING);
+  pinMode(0, INPUT);
+  digitalWrite(0,LOW);
 }
 
-
+int MOTOR_LEFT = 2; //PWM output for left motor
+int MOTOR_RIGHT = 3; //PWM output for right motor
+int QRD_LEFT = 0; //Left QRD for tape following
+int QRD_RIGHT = 1; //Right QRD for tape following
+int QRD_PET = 2; //QRD for locating pets
+int SWITCH_PLATE = 1; //Switch to see if pet is on plate
+int SWITCH_FRONT = 2; //Switch on front of arm
+int SERVO_CRANE = 1; //Servo for rotation of crane arm
+int SERVO_PLATE = 3; //Servo to drop pet
+int MOTOR_CRANE = 1; //Motor of arm movement
+int POTENTIOMETER_CRANE = 3; //Rotary potentiometer for crane arm
+int MAX_ANALOG = 1023;
 
 void loop()
 { 
   motor.speed(MOTOR_LEFT,0);
   motor.speed(MOTOR_RIGHT,0);
+  setServo(SERVO_CRANE, 90);
+  setServo(SERVO_FRONT, 90);
   
   LCD.clear(); LCD.home();
   LCD.print("Start: Menu");
@@ -91,11 +119,10 @@ void mainStart()
 {
   if (NUM == 0) {
     setServo(SERVO_CRANE, 90);
-    moveArm(0);
+    setArmHeight(2);
     PIDTape();
   }
   if (NUM == 4) {
-    pickupFront();
     PIDIR();
   }
 }
@@ -309,15 +336,86 @@ void Menu()
 }
 
 void setServo(int servo, int angle) {
-  if(servo == 1) {RCServo1.write(angle);}
-  else if(servo == 2) {RCServo2.write(angle);}
-  else {RCServo3.write(angle);}
+  if(servo == 1) {RCServo0.write(angle);}
+  else if(servo == 2) {RCServo1.write(angle);}
+  else {RCServo2.write(angle);}
 }
 
-void moveArm(int pos) {
-  
+void dropoff() {
+  setArmHeight(1);
+  setServo(SERVO_CRANE, 90);
+  delay(1000);
+  setServo(SERVO_PLATE, 90);
+  while(digitalRead(SWITCH_PLATE) == LOW) {}
 }
 
-void pickupFront() {
-  
+void pickup(int side, int height) {
+  if(height == 1) setArmHeight(1);
+  if(side == 1) setServo(SERVO_CRANE, 0);
+  else setServo(SERVO_CRANE, 180);
+  delay(1000);
+  setArmHeight(0);
+  dropoff();
 }
+
+void setArmHeight(int height) {
+      //Constants
+      int UP = 0;
+      int DOWN = 0;
+      int PICKUP = 0;
+      int DELAY = 2000;
+  
+      // Variables
+      int pot = 0;
+      int motor_speed = 0;
+      int count = 0;
+      int target = 0;
+      
+      // PID variables
+      int proportional = 0;
+      int P_gain = 0;
+      double compensator = 0;
+      
+      // Errors
+      int error = 0;
+      int last_error = 0;
+      int sum_error = 0;
+      
+      // Setting values
+      motor_speed = 100;
+      P_gain = 20;
+      
+      double frac_error = 0;
+
+      if(height == 1) target = UP;
+      else if(height == 2) target = DOWN;
+      else target = PICKUP;
+      
+      int start = millis();
+      
+      while((millis() - start) <= DELAY || digitalRead(SWITCH_PLATE) == LOW){
+          pot = analogRead(POTENTIOMETER_CRANE);
+  
+          if(pot > target) {
+              error = (pot - target) / 10.0;
+          }
+          if(pot < target) {
+              error = (pot - target) / 10.0;
+          }
+
+          if( pot <= (target) && pot >= (target)) {
+              error = 0;
+          }
+          
+          proportional = P_gain * error;
+          
+          compensator = proportional;
+          
+          if( compensator > 200) compensator = 200;
+          if( compensator < -200) compensator = -200;
+          
+          motor.speed(MOTOR_CRANE, compensator);
+  
+          last_error = error;
+      }
+ }
