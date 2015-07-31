@@ -184,6 +184,9 @@ const int SPEED_IR = 500;
 //Other
 const int STOP_IR = 1023;
 const int STOP_RE = 30;
+const int EXIT_IR = 1;
+const int EXIT_RE = 2;
+const int EXIT_TAPE = 3;
 
 /*
 =================
@@ -252,10 +255,9 @@ void mainStart()
       PIDTape();
     }
     if (NUM == 4) {
-      moveTo(-15, 32, false);
+      moveTo(-15, 30, false);
       moveTo(-20, 0, false);
-      PIDIR(false);
-      if(DEBUG) {delay(2000);}
+      PIDIR(EXIT_RE);
       ArmPID(HEIGHT,ARM_UP,false);
       pickup(ARM_RIGHT, true);
       ArmPID(HEIGHT,ARM_HOR,false);
@@ -612,7 +614,12 @@ void PIDTape()
 ============
 */
 
-void PIDIR(bool tf)
+/*
+exit:
+
+*/
+
+void PIDIR(int exitVal)
 {
   //Variables
   int irVal_left = 0; //Value of IR sensor
@@ -653,31 +660,35 @@ void PIDIR(bool tf)
     irVal_right = analogRead(IR_RIGHT);
 
     //Stop at IR stop value
-    if(irVal_left > STOP_IR && irVal_right > STOP_IR && !tf) {
-      delay(100);
-      irVal_left = analogRead(IR_LEFT);
-      irVal_right = analogRead(IR_RIGHT);
+    if(exitVal == EXIT_IR) {
       if(irVal_left > STOP_IR && irVal_right > STOP_IR) {
+        delay(100);
+        irVal_left = analogRead(IR_LEFT);
+        irVal_right = analogRead(IR_RIGHT);
+        if(irVal_left > STOP_IR && irVal_right > STOP_IR) {
+          if(DEBUG) {
+            LCD.clear(); LCD.home(); LCD.print("IR Thresh");
+          }
+          stopDrive();
+          return;
+        }
+      }
+    }
+
+    //Stop at RE stop value
+    if(exitVal == EXIT_RE) {
+      checkEnc();
+      if(TURNS_LEFT >= turns && TURNS_RIGHT >= turns) {
         if(DEBUG) {
-          LCD.clear(); LCD.home(); LCD.print("IR Thresh");
+          LCD.clear(); LCD.home(); LCD.print("RE Thresh");
         }
         stopDrive();
         return;
       }
     }
 
-    //Stop at RE stop value
-    checkEnc();
-    if(TURNS_LEFT >= turns && TURNS_RIGHT >= turns && !tf) {
-      if(DEBUG) {
-        LCD.clear(); LCD.home(); LCD.print("RE Thresh");
-      }
-      stopDrive();
-      return;
-    }
-
     //Stop when front QRD's are on tape
-    if(tf) {
+    if(exitVal == EXIT_TAPE) {
       if(analogRead(QRD_LEFT) > THRESHOLD) {
         if(DEBUG) {
           LCD.clear(); LCD.home(); LCD.print("TF");
