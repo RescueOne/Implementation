@@ -75,6 +75,14 @@ int count_setup = 0;
 const bool DEBUG = true;
 
 /*
+==========
+== MISC ==
+==========
+*/
+
+const int PID_TIMEOUT = 2000;
+
+/*
 ==================
 == TINAH INPUTS ==
 ==================
@@ -117,7 +125,7 @@ const int ROT_RIGHT = 1; //Rotary encoder for right wheel
 
 // Speed
 const int SPEED_HEIGHT = 85;
-const int SPEED_ANGLE = 70;
+const int SPEED_ANGLE = 80;
 
 // PID Constants
 const int P_HEIGHT = 10;
@@ -135,11 +143,11 @@ const int D_ANGLE = 5;
 // const int ARM_HOR = 750;
 // const int ARM_DOWN_LOW = 590;
 // const int ARM_DOWN_HIGH = 690;
-const int ARM_UP = 300;
-const int ARM_UP_2 = 280;
+const int ARM_UP = 290;
+const int ARM_UP_2 = 260;
 const int ARM_HOR = 380;
 const int ARM_DOWN_LOW = 520;
-const int ARM_DOWN_HIGH = 400;
+const int ARM_DOWN_HIGH = 420;
 const int ARM_LEFT = 200;
 const int ARM_CENTRE = 480;
 const int ARM_RIGHT = 670;
@@ -149,16 +157,16 @@ const int SHIFT = 70; // The amount the arm shifts on each attempt
 const int FRONT_FORWARD_CENTRE = 143;
 const int FRONT_FORWARD_LEFT = 180;
 const int FRONT_FORWARD_RIGHT = 120;
-const int FRONT_PET = 85;
+const int FRONT_PET = 30;
 const int FRONT_BACK = 0;
 
 // Range of where the arm will be in an "error-free" zero
-const int DEADBAND_HEIGHT = 30;
-const int DEADBAND_ANGLE = 20;
+const int DEADBAND_HEIGHT = 20;
+const int DEADBAND_ANGLE = 25;
 
 // Other
 const int MAX_PICKUP_TIME = 3000; //Max time the arm can move down for pickup (low pet)pet)
-const int TIMEOUT = 5000;
+const int TIMEOUT = 4000;
 const int MAX_ANALOG = 1023; // for converting arduino resolution to speed
 const int PET_QRD_THRESHOLD = 600; // when the arm will stop to pick up pets
 
@@ -202,7 +210,7 @@ int cur_enc_right = 0;
 //PID
 const int P_IR = 50;
 const int D_IR = 60;
-const int SPEED_IR = 500;
+const int SPEED_IR = 700;
 
 //Other
 const int STOP_RE_1 = 35;
@@ -291,60 +299,62 @@ void mainStart()
   LCD.print("NUM");
   while(true) {
     // Strategy for 6 pets
-    if (PETS == 6) {
-      if (NUM == 0) {
-        ArmPID(HEIGHT,ARM_HOR, false);
-        PIDTape();
-      }
-      if (NUM == 4) {
-        moveTo(-20, 10, false);
-        setServo(SERVO_FRONT,FRONT_FORWARD_CENTRE);
-        delay(500);
-        moveTo(5, 15, false);
-        moveTo(-30, 0, false);
-        PIDIR(EXIT_RE);
-        ArmPID(HEIGHT,ARM_UP,false);
-        pickup(ARM_RIGHT, true);
-        ArmPID(HEIGHT,ARM_HOR,false);
-        PIDIR(EXIT_SWI);
-        pickupFront();
-        moveTo(0,-50,false);
-        moveTo(180,0,false);
-        setServo(SERVO_FRONT,FRONT_PET);
-        PIDIR(EXIT_TAPE);
-        moveTo(0,10,false);
-        findTape(LEFT);
-        NUM++;
-        PIDTape();
-      }
-      if (NUM == 6) {
-        moveTo(0, 10, false);
-        ArmPID(HEIGHT,ARM_HOR,false);
-        pickup(ARM_LEFT, true);
-        findTape(LEFT);
-        PIDTape();
-      }
-      if (NUM == 7) {
-        moveTo(0, 30, false);
-        moveTo(-20, -15, false);
-        ArmPID(HEIGHT,ARM_HOR,false);
-        pickup(ARM_LEFT, true);
-        findTape(RIGHT);
-        PIDTape();
-      }
-      if (NUM == 8) {
-        moveTo(0, 28, false);
-        moveTo(-20, -10, false);
-        ArmPID(HEIGHT,ARM_HOR,false);
-        pickup(ARM_LEFT, false);
-        setServo(SERVO_FRONT,FRONT_FORWARD_CENTRE);
-        delay(500);
-        moveTo(-60, 0, true);
-        PIDTape();
-      }
+    if (NUM == 0) {
+      ArmPID(HEIGHT,ARM_HOR, false);
+      PIDTape(PETS == 3);
     }
-    //Strategy for 3 pets
-    if (PETS == 3) {
+    if (NUM == 3) {
+      moveTo(50, 0, false);
+      moveTo(270, 0, true);
+      setServo(SERVO_FRONT,FRONT_PET);
+      NUM = 5;
+      PIDTape(false);
+    }
+    if (NUM == 4) {
+      moveTo(-20, 10, false);
+      setServo(SERVO_FRONT,FRONT_FORWARD_CENTRE);
+      delay(500);
+      moveTo(5, 17, false);
+      moveTo(-35, 0, false);
+      PIDIR(EXIT_RE);
+      ArmPID(HEIGHT,ARM_UP,false);
+      pickup(ARM_RIGHT, true);
+      ArmPID(HEIGHT,ARM_HOR,false);
+      PIDIR(EXIT_SWI);
+      pickupFront();
+      moveTo(0,-50,false);
+      moveTo(180,0,false);
+      setServo(SERVO_FRONT,FRONT_PET);
+      PIDIR(EXIT_TAPE);
+      moveTo(0,10,false);
+      findTape(LEFT);
+      NUM++;
+      PIDTape(false);
+    }
+    if (NUM == 6) {
+      moveTo(0, 10, false);
+      // ArmPID(HEIGHT,ARM_UP,false);
+      pickup(ARM_LEFT, true);
+      findTape(LEFT);
+      PIDTape(false);
+    }
+    if (NUM == 7) {
+      moveTo(0, 30, false);
+      moveTo(-20, -15, false);
+      // ArmPID(HEIGHT,ARM_UP,false);
+      pickup(ARM_LEFT, true);
+      findTape(RIGHT);
+      PIDTape(false);
+    }
+    if (NUM == 8) {
+      moveTo(0, 28, false);
+      moveTo(-20, -10, false);
+      // ArmPID(HEIGHT,ARM_UP,false);
+      pickup(ARM_LEFT, false);
+      setServo(SERVO_FRONT,FRONT_FORWARD_CENTRE);
+      delay(500);
+      moveTo(-60, 0, true);
+      PIDTape(false);
     }
   }
 }
@@ -504,11 +514,13 @@ void dropoff(bool drop)
 {
   ArmPID(HEIGHT, ARM_UP, false);
   ArmPID(ANGLE, ARM_CENTRE, false);
-  ArmPID(HEIGHT, ARM_UP_2, false);
-  if(drop) {setServo(SERVO_PLATE, 90);}
+  if(drop) {
+    ArmPID(HEIGHT, ARM_UP_2, false);
+    setServo(SERVO_PLATE, 90);
+  }
   while(digitalRead(SWITCH_PLATE) == LOW && drop) {}
   delay(500);
-  if(drop) {ArmPID(HEIGHT,ARM_HOR,false);}
+  if(drop) {ArmPID(HEIGHT,ARM_HOR,true);}
   else {ArmPID(HEIGHT,ARM_UP,false);}
   setServo(SERVO_PLATE, 0);
 }
@@ -558,13 +570,11 @@ Performs actions to pickup 6th pet
 void pickupFront() {
   delay(500);
   setServo(SERVO_FRONT,FRONT_FORWARD_LEFT);
-  delay(1000);
+  delay(600);
   setServo(SERVO_FRONT,FRONT_FORWARD_RIGHT);
-  delay(1000);
+  delay(600);
   setServo(SERVO_FRONT,FRONT_FORWARD_LEFT);
-  delay(1000);
-  setServo(SERVO_FRONT,FRONT_FORWARD_RIGHT);
-  delay(1000);
+  delay(600);
   setServo(SERVO_FRONT,FRONT_FORWARD_CENTRE);
 }
 
@@ -583,7 +593,7 @@ For reference:
   D - acts as damping
 */
 
-void PIDTape()
+void PIDTape(bool timeout)
 {
   LCD.clear(); LCD.home();
   LCD.print("NUM");
@@ -631,6 +641,8 @@ void PIDTape()
       }
       count_debug ++;
     }
+
+    if(timeout && NUM == 3 && (millis() - start_time) > PID_TIMEOUT) {stopDrive(); return;}
 
     if(count == 0) {start_time = millis(); count++;}
     if((millis() - start_time) > WAIT_AFTER_PID) {
@@ -906,7 +918,7 @@ void ArmPID(int dim, int pos, bool swi)
 
     //Check if arm is within deadband of target
     if( pot <= ( pos + deadband ) && pot >= ( pos - deadband)) {
-      if (dim == HEIGHT && target == 0) {target = 700;}
+      if (dim == HEIGHT && target == 0) {target = 900;}
       target++;
     }
     else { target = 0; }
@@ -989,47 +1001,3 @@ void Menu()
     }
   }
 }
-
-// typedef enum
-// {
-//   FILTER_A,
-//   FILTER_B,
-//   FILTER_C,
-// } filter_select;
-
-// filter_select select = FILTER_A;
-
-// const int FILTER_SAMPLES = 4;
-
-// int filtered_value = 0;
-
-// void measure()
-// {
-//   int new_value = analogRead(1);
-//   filtered_value = (FILTER_SAMPLES-1)*filtered_value + new_value;
-//   filtered_value = filtered_value / FILTER_SAMPLES;
-
-// }
-
-// unsigned int filterValueA = 0;
-// unsigned int filterValueB = 0;
-
-// void filter_measure(unsigned int* filterValue, int pin)
-// {
-//   int new_value = analogRead(pin);
-//   *filterValue = (FILTER_SAMPLES-1)*(*filterValue) + new_value;
-//   *filterValue /= FILTER_SAMPLES;
-// }
-
-// // call it
-// filter_measure(&filterValueA, 1);
-
-// unsigned int filter(unsigned int filterValue, int pin)
-// {
-// int new_value = analogRead(pin);
-//   filterValue = (FILTER_SAMPLES-1)*(*filterValue) + new_value;
-//   filterValue /= FILTER_SAMPLES;
-//   return filterValue;
-// }
-
-
