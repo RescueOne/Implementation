@@ -116,7 +116,7 @@ const int ROT_RIGHT = 1; //Rotary encoder for right wheel
 // Height -> vertical movement of the arm
 
 // Speed
-const int SPEED_HEIGHT = 80;
+const int SPEED_HEIGHT = 85;
 const int SPEED_ANGLE = 70;
 
 // PID Constants
@@ -130,13 +130,18 @@ const int I_MAX_ANGLE = 150;
 const int D_ANGLE = 5;
 
 // Positions for main arm
-const int ARM_UP = 830;
-const int ARM_UP_2 = 840;
-const int ARM_HOR = 750;
-const int ARM_DOWN_LOW = 590;
-const int ARM_DOWN_HIGH = 690;
+// const int ARM_UP = 830;
+// const int ARM_UP_2 = 840;
+// const int ARM_HOR = 750;
+// const int ARM_DOWN_LOW = 590;
+// const int ARM_DOWN_HIGH = 690;
+const int ARM_UP = 300;
+const int ARM_UP_2 = 280;
+const int ARM_HOR = 380;
+const int ARM_DOWN_LOW = 520;
+const int ARM_DOWN_HIGH = 400;
 const int ARM_LEFT = 200;
-const int ARM_CENTRE = 470;
+const int ARM_CENTRE = 480;
 const int ARM_RIGHT = 670;
 const int SHIFT = 70; // The amount the arm shifts on each attempt
 
@@ -149,7 +154,7 @@ const int FRONT_BACK = 0;
 
 // Range of where the arm will be in an "error-free" zero
 const int DEADBAND_HEIGHT = 30;
-const int DEADBAND_ANGLE = 25;
+const int DEADBAND_ANGLE = 20;
 
 // Other
 const int MAX_PICKUP_TIME = 3000; //Max time the arm can move down for pickup (low pet)pet)
@@ -251,12 +256,6 @@ void loop()
           PETS = 3;
           break;
         case 3:
-          PETS = 4;
-          break;
-        case 4:
-          PETS = 5;
-          break;
-        case 5:
           PETS = 6;
           break;
         default:
@@ -291,56 +290,61 @@ void mainStart()
   LCD.clear(); LCD.home();
   LCD.print("NUM");
   while(true) {
-    // at the start, sets the arm to fit in the door then runs PID code
-    if (NUM == 0) {
-      ArmPID(HEIGHT,ARM_HOR, false);
-      PIDTape();
+    // Strategy for 6 pets
+    if (PETS == 6) {
+      if (NUM == 0) {
+        ArmPID(HEIGHT,ARM_HOR, false);
+        PIDTape();
+      }
+      if (NUM == 4) {
+        moveTo(-20, 10, false);
+        setServo(SERVO_FRONT,FRONT_FORWARD_CENTRE);
+        delay(500);
+        moveTo(5, 15, false);
+        moveTo(-30, 0, false);
+        PIDIR(EXIT_RE);
+        ArmPID(HEIGHT,ARM_UP,false);
+        pickup(ARM_RIGHT, true);
+        ArmPID(HEIGHT,ARM_HOR,false);
+        PIDIR(EXIT_SWI);
+        pickupFront();
+        moveTo(0,-50,false);
+        moveTo(180,0,false);
+        setServo(SERVO_FRONT,FRONT_PET);
+        PIDIR(EXIT_TAPE);
+        moveTo(0,10,false);
+        findTape(LEFT);
+        NUM++;
+        PIDTape();
+      }
+      if (NUM == 6) {
+        moveTo(0, 10, false);
+        ArmPID(HEIGHT,ARM_HOR,false);
+        pickup(ARM_LEFT, true);
+        findTape(LEFT);
+        PIDTape();
+      }
+      if (NUM == 7) {
+        moveTo(0, 30, false);
+        moveTo(-20, -15, false);
+        ArmPID(HEIGHT,ARM_HOR,false);
+        pickup(ARM_LEFT, true);
+        findTape(RIGHT);
+        PIDTape();
+      }
+      if (NUM == 8) {
+        moveTo(0, 28, false);
+        moveTo(-20, -10, false);
+        ArmPID(HEIGHT,ARM_HOR,false);
+        pickup(ARM_LEFT, false);
+        setServo(SERVO_FRONT,FRONT_FORWARD_CENTRE);
+        delay(500);
+        moveTo(-60, 0, true);
+        PIDTape();
+      }
     }
-    if (NUM == 4) {
-      moveTo(-20, 10, false);
-      setServo(SERVO_FRONT,FRONT_FORWARD_CENTRE);
-      delay(500);
-      moveTo(5, 15, false);
-      moveTo(-30, 0, false);
-      PIDIR(EXIT_RE);
-      ArmPID(HEIGHT,ARM_UP,false);
-      pickup(ARM_RIGHT, true);
-      ArmPID(HEIGHT,ARM_HOR,false);
-      PIDIR(EXIT_SWI);
-      pickupFront();
-      moveTo(0,-50,false);
-      moveTo(180,0,false);
-      setServo(SERVO_FRONT,FRONT_PET);
-      PIDIR(EXIT_TAPE);
-      moveTo(0,10,false);
-      findTape(LEFT);
-      NUM++;
-      PIDTape();
-    }
-    if (NUM == 6) {
-      moveTo(0, 10, false);
-      ArmPID(HEIGHT,ARM_HOR,false);
-      pickup(ARM_LEFT, true);
-      findTape(LEFT);
-      PIDTape();
-    }
-    if (NUM == 7) {
-      moveTo(0, 30, false);
-      moveTo(-20, -15, false);
-      ArmPID(HEIGHT,ARM_HOR,false);
-      pickup(ARM_LEFT, true);
-      findTape(RIGHT);
-      PIDTape();
-    }
-    if (NUM == 8) {
-      moveTo(0, 28, false);
-      moveTo(-20, -10, false);
-      ArmPID(HEIGHT,ARM_HOR,false);
-      pickup(ARM_LEFT, false);
-      setServo(SERVO_FRONT,FRONT_FORWARD_CENTRE);
-      delay(500);
-      moveTo(-60, 0, true);
-      PIDTape();
+    //Strategy for 3 pets
+    if (PETS == 3) {
     }
   }
 }
@@ -895,7 +899,7 @@ void ArmPID(int dim, int pos, bool swi)
 
     //Read current position
     if (dim == HEIGHT) {filter_measure(); pot = height_pot;}
-    else {pot = analogRead(PIN);}
+    pot = analogRead(PIN);
 
     //Determine error
     error = (pot - pos) / 10.0;
@@ -911,7 +915,6 @@ void ArmPID(int dim, int pos, bool swi)
     proportional = P_gain * error;
     derivative = D_gain * (error - last_error);
     integral = (I_gain * error) + integral;
-
 
     // handling integral gain
     if ( integral > maxI) { integral = maxI;}
