@@ -165,7 +165,7 @@ const int DEADBAND_HEIGHT = 20;
 const int DEADBAND_ANGLE = 25;
 
 // Other
-const int MAX_PICKUP_TIME = 3000; //Max time the arm can move down for pickup (low pet)pet)
+const int MAX_PICKUP_TIME = 2000; //Max time the arm can move down for pickup (low pet)pet)
 const int TIMEOUT = 4000;
 const int MAX_ANALOG = 1023; // for converting arduino resolution to speed
 const int PET_QRD_THRESHOLD = 600; // when the arm will stop to pick up pets
@@ -213,10 +213,11 @@ const int D_IR = 60;
 const int SPEED_IR = 700;
 
 //Other
-const int STOP_RE_1 = 35;
+const int STOP_RE_1 = 34;
 const int EXIT_RE = 1;
 const int EXIT_SWI = 2;
 const int EXIT_TAPE = 3;
+const int IR_TIMEOUT = 4000;
 
 /*
 =================
@@ -312,16 +313,16 @@ void mainStart()
     }
     if (NUM == 4) {
       moveTo(-20, 10, false);
+      moveTo(5, 17, false);
       setServo(SERVO_FRONT,FRONT_FORWARD_CENTRE);
       delay(500);
-      moveTo(5, 17, false);
       moveTo(-35, 0, false);
       PIDIR(EXIT_RE);
       ArmPID(HEIGHT,ARM_UP,false);
       pickup(ARM_RIGHT, true);
       ArmPID(HEIGHT,ARM_HOR,false);
       PIDIR(EXIT_SWI);
-      pickupFront();
+      pickupFront(3);
       moveTo(0,-50,false);
       moveTo(180,0,false);
       setServo(SERVO_FRONT,FRONT_PET);
@@ -340,7 +341,7 @@ void mainStart()
     }
     if (NUM == 7) {
       moveTo(0, 30, false);
-      moveTo(-20, -15, false);
+      moveTo(-20, -17, false);
       // ArmPID(HEIGHT,ARM_UP,false);
       pickup(ARM_LEFT, true);
       findTape(RIGHT);
@@ -348,7 +349,7 @@ void mainStart()
     }
     if (NUM == 8) {
       moveTo(0, 28, false);
-      moveTo(-20, -10, false);
+      moveTo(-20, -13, false);
       // ArmPID(HEIGHT,ARM_UP,false);
       pickup(ARM_LEFT, false);
       setServo(SERVO_FRONT,FRONT_FORWARD_CENTRE);
@@ -520,7 +521,7 @@ void dropoff(bool drop)
   }
   while(digitalRead(SWITCH_PLATE) == LOW && drop) {}
   delay(500);
-  if(drop) {ArmPID(HEIGHT,ARM_HOR,true);}
+  if(NUM == 4) {ArmPID(HEIGHT,ARM_HOR,true);}
   else {ArmPID(HEIGHT,ARM_UP,false);}
   setServo(SERVO_PLATE, 0);
 }
@@ -567,14 +568,20 @@ void pickup(int side, bool drop)
 /*
 Performs actions to pickup 6th pet
 */
-void pickupFront() {
+void pickupFront(int times) {
+  int count = 0;
   delay(500);
-  setServo(SERVO_FRONT,FRONT_FORWARD_LEFT);
-  delay(600);
-  setServo(SERVO_FRONT,FRONT_FORWARD_RIGHT);
-  delay(600);
-  setServo(SERVO_FRONT,FRONT_FORWARD_LEFT);
-  delay(600);
+  for (int i = 0; i < times; i++) {
+    if(count == 0) {
+      setServo(SERVO_FRONT,FRONT_FORWARD_LEFT);
+      delay(600);
+      count ++;
+    } else {
+      setServo(SERVO_FRONT,FRONT_FORWARD_RIGHT);
+      delay(600);
+      count --;
+    }
+  }
   setServo(SERVO_FRONT,FRONT_FORWARD_CENTRE);
 }
 
@@ -735,6 +742,8 @@ void PIDIR(int exitVal)
 
   int spd = (int)((float)SPEED_IR*((float)255/(float)1023));
 
+  long start_pid = millis();
+
   //PID loop
   while (true)
   {
@@ -758,7 +767,7 @@ void PIDIR(int exitVal)
     //Stop at RE stop value
     if(exitVal == EXIT_RE) {
       checkEnc();
-      if(TURNS_LEFT >= turns && TURNS_RIGHT >= turns) {
+      if((TURNS_LEFT >= turns && TURNS_RIGHT >= turns) || (millis() - start_pid) > IR_TIMEOUT) {
         if(DEBUG) {
           LCD.clear(); LCD.home(); LCD.print("RE Thresh");
         }
